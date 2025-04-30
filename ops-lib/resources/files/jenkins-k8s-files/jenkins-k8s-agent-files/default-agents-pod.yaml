@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jenkins-agents
+  namespace: jenkins-agents
+  labels:
+    job: agents
+spec:
+  imagePullSecrets:
+  - name: regsecret
+  containers:
+  - name: jnlp
+    image: omkarsrcm/jenkins-agents:v17
+    env:
+    - name: DOCKER_HOST
+      value: "tcp://dockerengine:2376"
+    - name: DOCKER_TLS
+      value: "true"
+    - name: DOCKER_TLS_VERIFY
+      value: "true"
+    resources:
+      requests:
+        memory: '300Mi'
+        cpu: '100m'
+      limits:
+        memory: '1600Mi'
+        cpu: '500m'
+  - name: yq
+    image: mikefarah/yq
+    command: ["sleep", "1500"]
+    resources:
+      limits:
+        memory: '300Mi'
+        cpu: '100m'
+      requests:
+        memory: '100Mi'
+        cpu: '10m'
