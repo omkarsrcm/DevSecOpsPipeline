@@ -162,7 +162,5 @@ This pipeline handles the **deployment** of previously built Docker images using
 ## 👥 Maintainers
 
 > 📫 **Omkar Kulkarni**  
-> ✉️ `Omkar Kulkarni`  
-
 ---
 
