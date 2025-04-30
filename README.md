@@ -160,9 +160,8 @@ This pipeline handles the **deployment** of previously built Docker images using
 
 ## 👥 Maintainers
 
-> 📫 **DevOps Team**  
-> ✉️ `devops@omvexis.com`  
-> 🔒 Internal use only
+> 📫 **Omkar Kulkarni**  
+> ✉️ `Omkar Kulkarni`  
 
 ---
 
