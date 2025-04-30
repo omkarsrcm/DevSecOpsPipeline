@@ -97,5 +97,5 @@ This Jenkins pipeline automates the build, test, security scan, and deployment p
 
 ## 🧑‍💻 Maintainers
 
-For any issues with this pipeline, please contact the DevOps team at `devops@omvexis.com`.
+For any issues with this pipeline, please contact the Omkar Kulkarni at `omkarkulkarni44@yahoo.in`.
 
