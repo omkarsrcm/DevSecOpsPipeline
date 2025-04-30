@@ -137,7 +137,6 @@ This pipeline handles the **deployment** of previously built Docker images using
   - SCA (Software Composition Analysis)
 - **Trivy** for Docker image vulnerability scanning
 - **Helm** for Kubernetes deployments
-- **Python & Jinja2** for config templating
 - **Azure DevOps Git** for source and config repositories
 
 ---
