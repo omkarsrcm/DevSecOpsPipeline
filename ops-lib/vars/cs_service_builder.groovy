@@ -19,7 +19,7 @@ def call(body) {
             Git_Repo_Name = "central"
             Conf_Filename = 'template.conf'
             CumulusConfigID = 'dc2fb579-39ae-4fb9-9eda-484da909c3a1'
-            MainConfigFileName = "omvexis_config.yaml" // This name is name of main app config file in cumulus-config centeral repo
+            MainConfigFileName = "omvexis_config.yaml" // This name is name of main app config file in cumulus-config
             SnykApi = credentials('snyk_api_token')
             }
         parameters {
@@ -27,8 +27,8 @@ def call(body) {
             string(defaultValue: '', description: 'Please provide the branch_name for cloning the repo.', name: 'BranchName', trim: false)
             booleanParam(name: 'Deployment', defaultValue: false, description: 'Please select if you want to deploy the docker image.')
             string defaultValue: '', description: 'Please Provide Scripts Name in Lower-Case only you want to run,Multi script name can be passed eg (migrate.py,bootstrap.py),Otherwise leave it blank ', name: 'Script_Name', trim: true
-            choice(choices: ['hfnlife_ui', 'hfnlife_products','hfnlife_orders','hfnlife_user'], description: 'Please select the service to be built', name: 'Repo_Name')
-            choice(choices: ['dev', 'prod-eu'], description: 'Please select the cluster', name: 'Cluster_Type')
+            choice(choices: ['hfnlife-ui', 'hfnlife_products','hfnlife_orders','hfnlife_user'], description: 'Please select the service to be built', name: 'Repo_Name')
+            choice(choices: ['hfnlife_dev', 'hfnlife_prd'], description: 'Please select the cluster', name: 'Cluster_Type')
         }
 
         stages {

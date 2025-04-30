@@ -15,9 +15,9 @@ def podConfig = libraryResource 'files/jenkins-k8s-files/jenkins-k8s-agent-files
      parameters{
           choice(choices: ['commercial','federal'], description: 'Please select Federal for ironbank images,otherwise leave it at the default option', name: 'Docker_Build_Type')   
           string (defaultValue: '', description: 'Please Provide Image Tag No,You would like to deploy', name: 'Tag_No', trim: true)
-          choice(choices: ['dev', 'prod-eu'], description: 'Please select the cluster', name: 'Cluster_Type')
+          choice(choices: ['hfnlife_dev', 'hfnlife_prd'], description: 'Please select the cluster', name: 'Cluster_Type')
           string (defaultValue: '', description: '[Optional] Comma separated list of scripts that has to be executed. Full path has to be specified', name: 'Script_Name', trim: true)
-          choice(choices: ['hfnlife_ui', 'hfnlife_products','hfnlife_orders','hfnlife_user'], description: 'Please select the service to be deploy', name: 'Service_Name')
+          choice(choices: ['hfnlife-ui', 'hfnlife_products','hfnlife_orders','hfnlife_user'], description: 'Please select the service to be deploy', name: 'Service_Name')
 
      }
      environment{
@@ -32,6 +32,7 @@ def podConfig = libraryResource 'files/jenkins-k8s-files/jenkins-k8s-agent-files
         DockerSocketPath = "/var/run/docker.sock"
         AppDConfigPath = "/opt/appdynamics/config"
         ImageRepo = "omkarsrcm"
+        HelmRepoUrl = "oci://registry-1.docker.io/omkarsrcm"
      }
      stages{
          stage('User Validation') {
@@ -182,9 +183,11 @@ def podConfig = libraryResource 'files/jenkins-k8s-files/jenkins-k8s-agent-files
                         echo "##### Package helm chart #####"
                         sh "pwd"
                         sh "ls -l"
-                        sh "helm package hfnlife_ui --version ${Tag_No}"
-                        sh 'echo "SRCMnik@71234" | helm registry login registry-1.docker.io -u omkarsrcm --password-stdin'
-                        sh "helm push hfnlife_ui-${Tag_No}.tgz oci://registry-1.docker.io/omkarsrcm"
+                        sh "helm package ${Service_Name} --version ${Tag_No}"
+                        withCredentials([string(credentialsId: 'helmlogin', variable: 'helmlogin')]) {
+                          sh "echo "${helmlogin}" | helm registry login registry-1.docker.io -u omkarsrcm --password-stdin"
+                        }
+                        sh "helm push ${Service_Name}-${Tag_No}.tgz oci://registry-1.docker.io/omkarsrcm"
                      }
               }
             }
@@ -197,12 +200,8 @@ def podConfig = libraryResource 'files/jenkins-k8s-files/jenkins-k8s-agent-files
              {
                  // This env is passed so csDeployer function which has if condition that check when to run pre-scripts container vs actual app container
                  env.RunNoScript = ''
-                 echo "########## Connecting to K8s cluster to perform deployment ###############"
-                 /* app.conf,acrurl/servicename:tagno,app_lic_path,ServiceDeploymentPublicIp,Remote_Name,Remote_Cred_Id*/
-                 echo "############## Passing following parameters for performing deployment ################"
-                 echo "#####${ServiceConfigFileName},${Registry}/${Service_Name}:${Tag_No},${ServiceDeploymentPublicIp},${Remote_Port},${Remote_Name},${Remote_Cred_Id},${Service_Name},${AppLogPath},${RunNoScript},${DockerSocketPath},${Imagenames},${TimeStamp} ########"
-                 opsUtils.csDeployer("${ServiceConfigFileName}","${Registry}/${ImageName}:${Tag_No}","${ServiceDeploymentPublicIp}","${Remote_Port}","${Remote_Name}","${Remote_Cred_Id}","${Service_Name}","${AppLicPath}","${AppLogPath}","${Registry}","${RegistryCred}","${AppDPath}","${AppDConfigPath}","${RunNoScript}","${DockerSocketPath}","${Imagenames}","${TimeStamp}","${AppDlogPath}")
-                
+                 echo "########## Connecting to $Cluster_Type-App-Server Cluster to perform deployment ###############"
+                 opsUtils.csDeployer("${Service_Name}","${Tag_No}","${HelmRepoUrl}","${Cluster_Type}")    
               }
             }
           }

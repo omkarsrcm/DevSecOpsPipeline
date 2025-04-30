@@ -59,105 +59,30 @@ def checkoutServiceSource(gitRepo, gitBranch, gitCredId) {
 }
 
 //Below function is used to connect a server to deploy docker containers.
-/* app.conf,acrurl/servicename:tagno,app_lic_path,Remote_Host_No,Remote_Name,Remote_Cred_Id,AppConfigPath*/
-//opsUtils.csDeployer("$ConfigAppRepo/${Service_Name}.conf","${Registry}/", "${Remote_Host_No}","${Remote_Name}","${Remote_Cred_Id}","${AppConfigPath}")
-
-def csDeployer(appConfigFile,dockerImageName,remoteHost,remotePort,remoteName,remoteCredId,appName,appLicPath,appLogPath,acrLoginUrl,acrLoginCreds,dataDogPath,dataDogConfigPath,scriptName,dockerSocketPath,imagenames,timeStamp,appDLogpath)
+def csDeployer(Service_Name,Tag_No,Helm_Repo_Url,Cluster_Type)
 {
-  def remote = [:]
-  remote.name = remoteName
-  remote.host = remoteHost
-  remote.allowAnyHosts = true
-  remote.port = remotePort as Integer
+    withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'whizgendeployer', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+    
+     sh """
+        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+        """
+    echo "###### Fetching kube-config file ######"
+    sh "aws eks update-kubeconfig --name ${Cluster_Type} --region ap-south-1"
+    sh "kubectl get ns"
+    def exists = sh(script: "helm status ${Service_Name} -n ${Service_Name} > /dev/null 2>&1",returnStatus: true
+    )
 
-  echo "############## Following App-Config-File=${appConfigFile},Docker-Image=${dockerImageName},App-Lic-Path=${appLicPath} will be used to perform deployment ##############"
-  withCredentials([sshUserPrivateKey(credentialsId: "${remoteCredId}", keyFileVariable: 'identity', usernameVariable: 'userName',passphraseVariable: '')]) {
-      remote.user = userName
-      remote.identityFile = identity
+    if (exists == 0) {
+        echo " Helm Update ${Service_Name} in-progress."
+        sh "helm upgrade ${Service_Name} ${Helm_Repo_Url}/${Service_Name} --version ${Tag_No} -n ${Service_Name}"
 
-      withCredentials([usernamePassword(credentialsId: "${acrLoginCreds}", passwordVariable: 'acrPass', usernameVariable: 'acrUser')])
-      {
-        echo "########### Login Into Azure-ACR for fetching the docker image ################"
-        sshCommand remote: remote, sudo: true,command: "docker login ${acrLoginUrl} -u ${acrUser} -p ${acrPass}"
-      }
-  if (scriptName != '')
-  {
-     echo "######### Performing Deployment of $appName-scripts-container #######"
-     sshCommand remote: remote, sudo: true,command: "docker ps -f status=exited -q | xargs docker rm || true"
-     try {
-        sshCommand remote: remote, sudo: true,command: "docker create -it --network host --name ${appName}-scriptRun -e EXECUTE_MIGRATION_SCRIPT='$scriptName' -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      } catch(error) {
-        // echo error.getClass().toString()
-        echo error.getMessage().toString()
-        sshCommand remote: remote, sudo: true,command: "docker container stop ${appName}-scriptRun || true"
-        sshCommand remote: remote, sudo: true,command: "docker container rm ${appName}-scriptRun || true"
-        sshCommand remote: remote, sudo: true,command: "docker create -it --network host --name ${appName}-scriptRun -e EXECUTE_MIGRATION_SCRIPT='$scriptName' -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      }
-      sshPut remote: remote, from: "${appName}", into: '/home/csomvexis'
-     sshCommand remote: remote, sudo: true,command: "ls -lrt /home/csomvexis | grep ${appName}"
-     sshCommand remote: remote, sudo: true,command: "tar c ${appName}/${appConfigFile} | docker cp - ${appName}-scriptRun:/etc/"
-     sshRemove remote: remote, path: "/home/csomvexis/${appName}"
-     //sh "tar c ${appName}/${appConfigFile} | ssh -i ${identity} -p ${remote.port} ${userName}@${remote.host} sudo docker cp - ${appName}-scriptRun:/etc/"
-     sshCommand remote: remote, sudo: true,command: "docker start -a ${appName}-scriptRun"
-  } else {
-      echo "########### Performing Deployment Now,Docker Container Name would be based on the service name ie $appName ##############"
-      if(imagenames == 'null')
-      {
-      env.PreviousDockerImageTagNo = sshCommand remote: remote, sudo: true,command: "docker inspect $appName | jq --raw-output '.[].Config.Image' || true "
-      sshCommand remote: remote, sudo: true,command: "docker pull $dockerImageName || true"
-      sshCommand remote: remote, sudo: true,command: "docker ps -f status=exited -q | xargs docker rm || true"
-
-      try {
-        sshCommand remote: remote, sudo: true,command: "docker create  --restart unless-stopped --network host --name ${appName}-New -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      } catch(error) {
-        echo error.getMessage().toString()
-        sshCommand remote: remote, sudo: true,command: "docker container stop ${appName}-New || true"
-        sshCommand remote: remote, sudo: true,command: "docker container rm ${appName}-New || true"
-        sshCommand remote: remote, sudo: true,command: "docker create  --restart unless-stopped --network host --name ${appName}-New -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      }
-      sshPut remote: remote, from: "${appName}", into: '/home/csomvexis'
-      sshCommand remote: remote, sudo: true,command: "ls -lrt /home/csomvexis | grep ${appName}"
-      sshCommand remote: remote, sudo: true,command: "tar c ${appName}/${appConfigFile} | docker cp - ${appName}-New:/etc/"
-      sshRemove remote: remote, path: "/home/csomvexis/${appName}"
-      //sh "tar c ${appName}/${appConfigFile} | ssh -i ${identity} -p ${remote.port} ${userName}@${remote.host} sudo docker cp - ${appName}-New:/etc/"
-      sshCommand remote: remote, sudo: true,command: "docker container stop $appName || true"
-      sshCommand remote: remote, sudo: true,command: "docker container rm $appName || true"
-      sshCommand remote: remote, sudo: true,command: "docker rename ${appName}-New ${appName} "
-      sshCommand remote: remote, sudo: true,command: "docker start ${appName}"
-      sshCommand remote: remote, sudo: true,command: "docker ps -f status=exited -q | xargs docker rm || true" 
-      }
-      else
-      {
-      env.PreviousDockerImageTagNo = sshCommand remote: remote, sudo: true,command: "docker inspect $appName | jq --raw-output '.[].Config.Image' || true "
-      def imageNamesList = imageNames.split(',')
-      imageNamesList.each { imageName ->
-        sshCommand remote: remote, sudo: true, command: "docker pull ${env.Registry}/${imageName}:${timeStamp}"
-      }
-      sshCommand remote: remote, sudo: true,command: "docker pull $dockerImageName || true"
-      sshCommand remote: remote, sudo: true,command: "docker ps -f status=exited -q | xargs docker rm || true"
-      try {
-        sshCommand remote: remote, sudo: true,command: "docker create  --restart unless-stopped --network host --name ${appName}-New -e BUILD_VERSION=${timeStamp} -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath  -v $dockerSocketPath:$dockerSocketPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      } catch(error) {
-        echo error.getMessage().toString()
-        sshCommand remote: remote, sudo: true,command: "docker container stop ${appName}-New || true"
-        sshCommand remote: remote, sudo: true,command: "docker container rm ${appName}-New || true"
-        sshCommand remote: remote, sudo: true,command: "docker create  --restart unless-stopped --network host --name ${appName}-New -e BUILD_VERSION=${timeStamp} -v $appLogPath-container:$appLogPath -v $appLicPath:$appLicPath -v $dataDogConfigPath:$dataDogConfigPath -v $dataDogPath:$dataDogPath  -v $dockerSocketPath:$dockerSocketPath -v $appDLogPath:$appDLogPath $dockerImageName 1>&2"
-      }
-      sshPut remote: remote, from: "${appName}", into: '/home/csomvexis'
-      sshCommand remote: remote, sudo: true,command: "ls -lrt /home/csomvexis | grep ${appName}"
-      sshCommand remote: remote, sudo: true,command: "tar c ${appName}/${appConfigFile} | docker cp - ${appName}-New:/etc/"
-      sshRemove remote: remote, path: "/home/csomvexis/${appName}"
-      //sh "tar c ${appName}/${appConfigFile} | ssh -i ${identity} -p ${remote.port} ${userName}@${remote.host} sudo docker cp - ${appName}-New:/etc/"
-      sshCommand remote: remote, sudo: true,command: "docker container stop $appName || true"
-      sshCommand remote: remote, sudo: true,command: "docker container rm $appName || true"
-      sshCommand remote: remote, sudo: true,command: "docker rename ${appName}-New ${appName} "
-      sshCommand remote: remote, sudo: true,command: "docker start ${appName}"
-      sshCommand remote: remote, sudo: true,command: "docker ps -f status=exited -q | xargs docker rm || true"
-      }
+    } else {
+        echo " Helm Install ${Service_Name} in-progress "
+        sh "helm install ${Service_Name} ${Helm_Repo_Url}/${Service_Name} --version ${Tag_No} -n ${Service_Name}"
     }
   }
 }
-
 //Below command used to fetch docker image to get label section
 def csDockerImageLabelFetch(RegistryUrl,RegistryCred,ServiceName,DockerBuildType,ClusterType,Tag_No)
 {
